@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>No-spend challenge tracker (free): streak and money saved, net of slips</title>
+<meta name="description" content="Free no-spend challenge tracker: write your paused categories and what you usually spend on them, tick each no-spend day, log the slips, and see your streak, your longest streak and the money the challenge has saved so far, per category, net of what you did spend. 7 to 90 days, CSV export, runs in your browser.">
+<link rel="canonical" href="https://ricco020.github.io/no-spend-challenge-tracker/">
+<style>
+:root{--ink:#1d1a24;--paper:#f3efe6;--navy:#23395b;--rust:#b2542b;--rule:#d8d0bd}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.6 Georgia,"Iowan Old Style",serif}
+main{max-width:860px;margin:0 auto;padding:36px 18px 60px}
+h1{font-size:1.9rem;line-height:1.15;margin:0 0 .4em;color:var(--navy)}
+h2{font-size:1.2rem;margin:1.8em 0 .5em;color:var(--navy)}
+a{color:var(--navy)}
+.box{background:#fff;border:1px solid var(--rule);border-radius:8px;padding:14px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+label{font-size:.85rem;display:flex;flex-direction:column;gap:3px;min-width:0}
+input,select{font:inherit;padding:7px;border:1px solid var(--rule);border-radius:5px;background:#fff;width:100%;min-width:0}
+.bill{display:grid;grid-template-columns:3fr 2fr 1.4fr auto;gap:8px;align-items:end;padding:8px 0;border-bottom:1px dashed var(--rule)}
+.bill button{font:inherit;padding:7px 10px;border:1px solid var(--rule);border-radius:5px;background:#fff;cursor:pointer}
+@media(max-width:620px){.bill{grid-template-columns:1fr 1fr auto}.bill label:first-child{grid-column:1/-1}}
+.pos{color:#2d6a3e}.neg{color:var(--rust)}
+.res td.n b{font-weight:bold}
+.del{font:inherit;padding:2px 7px;border:1px solid var(--rule);border-radius:4px;background:#fff;cursor:pointer}
+.dl{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+.dl button{font:inherit;font-weight:bold;padding:9px 14px;border:2px solid var(--navy);border-radius:6px;background:#fff;color:var(--navy);cursor:pointer}
+.dl button.main{background:var(--navy);color:#fff}
+.chk{flex-direction:row;align-items:center;gap:8px;font-size:.9rem}.chk input{width:auto}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0}
+.sum div{background:#fff;border-top:4px solid var(--rust);padding:10px 14px;border-radius:4px}
+.sum b{display:block;font-size:1.2rem;color:var(--navy)}
+.warn{background:#fbe9e1;border-left:4px solid var(--rust);padding:8px 12px;border-radius:4px;margin:10px 0}
+.res{width:100%;border-collapse:collapse;background:#fff;font-size:.93rem}
+.res th,.res td{border-bottom:1px solid var(--rule);padding:6px 8px;text-align:left;vertical-align:top}
+.res td.d,.res td.n{white-space:nowrap}.res td.n{text-align:right}
+.res tr.g td{background:#eef3f8;font-weight:bold;color:var(--navy)}
+.tag{display:inline-block;font-size:.75rem;padding:0 6px;border-radius:3px;background:#fbe9e1;color:var(--rust);margin-left:4px}
+.scroll{overflow-x:auto}
+small{color:#5f5a66}
+@media(max-width:620px){.res{font-size:.85rem}.res th,.res td{padding:5px 4px}}
+@media print{.box,.dl,.noprint{display:none}body{background:#fff}}
+.days{display:flex;flex-wrap:wrap;gap:6px 14px;margin:4px 0 12px}.days label{flex-direction:row;align-items:center;gap:5px;font-size:.95rem}.days input{width:auto}
+</style>
+<style>
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:8px 0}
+.cal .wd{font-size:.75rem;text-align:center;color:#5f5a66}
+.cal button{font:inherit;font-size:.85rem;min-height:46px;border:1px solid var(--rule);border-radius:5px;background:#fff;cursor:pointer;padding:2px;line-height:1.15}
+.cal button.ok{background:#2d6a3e;color:#fff;border-color:#2d6a3e}
+.cal button.slip{background:#fbe9e1;color:var(--rust);border-color:var(--rust)}
+.cal button.fut{opacity:.55}
+.cal button.sel{outline:3px solid var(--navy);outline-offset:1px}
+.cal button.today{font-weight:bold}
+.cal button small{display:block;font-size:.7rem;color:inherit}
+#ed{margin:10px 0;padding:10px;background:#eef3f8;border-radius:6px}
+#ed .dl{margin:6px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>No-spend challenge tracker</h1>
+<p>A no-spend challenge tracker usually gives you a square to colour each day. Coloured squares do not tell you whether the month is working. Write the categories you are pausing and what you normally spend on them in a week, tick the days you held, log the days you slipped (what, how much), and this page shows your current streak, your longest streak, and the money the challenge has kept in your account so far, per category, after taking off what you did spend.</p>
+<p class="noprint"><small>First visit: the page shows an example challenge started 9 days ago. Press "Clear everything" under the calendar and set up your own.</small></p>
+<div id="out"></div>
+<h2 class="noprint">Your challenge</h2>
+<div class="box">
+<div class="row">
+<label>First day<input id="start" type="date"></label>
+<label>Length<select id="len"><option value="7">7 days</option><option value="14">14 days</option><option value="21">21 days</option><option value="30" selected>30 days</option><option value="31">31 days</option><option value="60">60 days</option><option value="90">90 days</option></select></label>
+</div>
+<p style="margin:.2em 0"><b>Paused categories</b> <small>and what you usually spend on each in a normal week (look at last month's bank statement and divide by 4.3)</small></p>
+<div id="bills"></div>
+<div class="dl"><button id="add" type="button">+ Add a category</button></div>
+<p style="margin:.6em 0 .2em"><b>Calendar</b> <small>tap a day, then mark it</small></p>
+<div class="cal" id="cal"></div>
+<div id="ed"></div>
+<div class="dl"><button id="csv" type="button">Spreadsheet (CSV)</button><button id="prn" type="button">Print</button><button id="clr" type="button">Clear everything</button></div>
+<small>Nothing is sent anywhere: the page runs in your browser and keeps your challenge in this browser only. Export the CSV from time to time as a backup.</small>
+</div>
+<h2 class="noprint">How it is calculated</h2>
+<div class="noprint">
+<p><b>Money saved so far</b>, per category = what you usually spend on it in a week, divided by 7, times the days elapsed since the first day (today included), minus the slips you logged in that category. The total is the sum of the categories. It is an estimate built on your own usual spending: if your weekly figures are too high, the saving is too high. It does not count essentials (rent, groceries from the list, fuel), which a no-spend challenge keeps paying.</p>
+<p><b>If you hold to the end</b> = the same calculation over the full length, with the slips logged so far and no new ones.</p>
+<p><b>Current streak</b> = no-spend days in a row, counting back from today (or from yesterday if today is not marked yet). <b>Longest streak</b> = the longest run of no-spend days in the challenge. A past day left blank breaks a streak: mark it, one way or the other.</p>
+<p><b>Rules that make it last</b>: write before day 1 what stays essential, what is paused and what you do instead when the urge comes. Most challenges break on an unplanned purchase in the first week, which is why the slip log asks what you bought: two slips in the same category means that category needs a rule, not more willpower.</p>
+<p>Prefer to keep it on paper? The <a href="https://tidysheets.shop/p/no-spend-challenge-printable">printable no-spend challenge</a> has the rules page (essential, paused, what to do instead), a 30-day tracker, the slip log and an end-of-challenge page to add up the money saved and decide where it goes (US Letter and A4).</p>
+</div>
+</main>
+<script id="core">
+// money in cents, dates as YYYY-MM-DD (local, no time zone)
+function addDays(iso,n){const [y,m,d]=iso.split('-').map(Number);const t=new Date(Date.UTC(y,m-1,d+n));return t.toISOString().slice(0,10)}
+function dayDiff(a,b){const p=s=>{const [y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((p(b)-p(a))/864e5)}
+function compute(st,today){
+  const N=st.days,dates=[];for(let i=0;i<N;i++)dates.push(addDays(st.start,i));
+  const last=dates[N-1];
+  let elapsed=dayDiff(st.start,today)+1;if(elapsed<0)elapsed=0;if(elapsed>N)elapsed=N;
+  let ok=0,slip=0,blank=0,longest=0,run=0;const slipsBy={};
+  dates.forEach((d,i)=>{const m=st.marks[d];
+    if(m&&m.s==='ok'){ok++;run++;if(run>longest)longest=run}else{run=0}
+    if(m&&m.s==='slip'){slip++;slipsBy[m.cat]=(slipsBy[m.cat]||0)+(m.amt||0)}
+    if(!m&&i<elapsed&&d!==today)blank++});
+  let cur=0,i=elapsed-1;
+  if(i>=0&&!st.marks[dates[i]])i--;
+  for(;i>=0;i--){const m=st.marks[dates[i]];if(m&&m.s==='ok')cur++;else break}
+  const cats=st.cats.map(c=>{const s=slipsBy[c.name]||0;return{name:c.name,weekly:c.weekly,usual:Math.round(c.weekly*elapsed/7),slips:s,saved:Math.round(c.weekly*elapsed/7)-s,full:Math.round(c.weekly*N/7)-s}});
+  const other=Object.keys(slipsBy).filter(k=>!st.cats.some(c=>c.name===k)).reduce((a,k)=>a+slipsBy[k],0);
+  const saved=cats.reduce((a,c)=>a+c.saved,0)-other,full=cats.reduce((a,c)=>a+c.full,0)-other;
+  return{dates,last,elapsed,ok,slip,blank,cur,longest,cats,other,saved,full,slipTotal:Object.values(slipsBy).reduce((a,b)=>a+b,0)};
+}
+</script>
+<script>
+const $=id=>document.getElementById(id),KEY='nsc-v1';
+const iso=d=>{const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())};
+const TODAY=iso(new Date());
+const money=c=>(c<0?'-':'')+'$'+(Math.abs(c)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function example(){const s=addDays(TODAY,-9),m={};for(let i=0;i<10;i++)m[addDays(s,i)]={s:'ok'};
+  m[addDays(s,3)]={s:'slip',amt:450,cat:'Coffee out',note:'latte on the way to work'};delete m[addDays(s,9)];
+  return{start:s,days:30,cats:[{name:'Takeaway and delivery',weekly:4500},{name:'Coffee out',weekly:2000},{name:'Clothes',weekly:3000},{name:'Online shopping',weekly:3500}],marks:m}}
+let st;try{st=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!st||!st.start)st=example();
+let sel=null;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}};
+function drawCats(){$('bills').innerHTML=st.cats.map((c,i)=>`<div class="bill"><label>Category<input data-i="${i}" data-k="name" value="${esc(c.name)}"></label><label>Usual per week ($)<input data-i="${i}" data-k="weekly" type="number" min="0" step="1" inputmode="decimal" value="${c.weekly/100}"></label><span></span><button type="button" data-del="${i}" aria-label="Remove">✕</button></div>`).join('')}
+function drawCal(){const r=compute(st,TODAY);let h=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w=>`<div class="wd">${w}</div>`).join('');
+  const [y,m,d]=st.start.split('-').map(Number);const wd=(new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7;h+='<div></div>'.repeat(wd);
+  r.dates.forEach((dt,i)=>{const mk=st.marks[dt],cls=[mk?mk.s:'',dt>TODAY?'fut':'',dt===TODAY?'today':'',dt===sel?'sel':''].join(' ');
+    const lab=mk&&mk.s==='ok'?'✓':mk&&mk.s==='slip'?money(mk.amt||0):'';
+    h+=`<button type="button" class="${cls}" data-d="${dt}" aria-label="Day ${i+1}, ${dt}">${Number(dt.slice(8))}<small>${lab}</small></button>`});
+  $('cal').innerHTML=h;drawEd()}
+function drawEd(){if(!sel){$('ed').style.display='none';return}$('ed').style.display='block';const mk=st.marks[sel]||{};
+  $('ed').innerHTML=`<b>${sel}</b>${sel>TODAY?' <small>(in the future)</small>':''}<div class="dl"><button type="button" class="main" id="eok">No-spend day</button><button type="button" id="eclr">Leave blank</button></div>
+  <div class="row"><label>Slip: amount ($)<input id="eamt" type="number" min="0" step="0.01" inputmode="decimal" value="${mk.s==='slip'?(mk.amt/100):''}"></label><label>Category<select id="ecat">${st.cats.map(c=>`<option${mk.cat===c.name?' selected':''}>${esc(c.name)}</option>`).join('')}<option value="Other"${mk.cat==='Other'?' selected':''}>Other (not paused)</option></select></label><label>What and why<input id="enote" value="${esc(mk.note||'')}"></label></div><div class="dl"><button type="button" id="eslip">Save as a slip</button></div>`}
+function drawOut(){const r=compute(st,TODAY);let h='';
+  if(r.elapsed===0)h+=`<div class="warn">The challenge starts on ${st.start}. The figures fill in from day 1.</div>`;
+  h+=`<div class="sum"><div>Money saved so far<b class="${r.saved<0?'neg':'pos'}">${money(r.saved)}</b><small>day ${r.elapsed} of ${st.days}</small></div><div>If you hold to the end<b>${money(r.full)}</b><small>by ${r.last}, no new slip</small></div><div>Current streak<b>${r.cur} day${r.cur===1?'':'s'}</b><small>longest: ${r.longest}</small></div><div>No-spend days<b>${r.ok}</b><small>${r.slip} slip${r.slip===1?'':'s'}, ${money(r.slipTotal)} spent</small></div></div>`;
+  if(r.blank)h+=`<div class="warn">${r.blank} past day${r.blank===1?' is':'s are'} still blank. A blank day breaks the streak: tap it in the calendar and mark it.</div>`;
+  h+=`<div class="scroll"><table class="res"><tr><th>Paused category</th><th>Usual so far</th><th>Slips</th><th>Saved</th><th>By the end</th></tr>`+
+   r.cats.map(c=>`<tr><td>${esc(c.name)}</td><td class="n">${money(c.usual)}</td><td class="n">${c.slips?money(c.slips):'-'}</td><td class="n ${c.saved<0?'neg':'pos'}">${money(c.saved)}</td><td class="n">${money(c.full)}</td></tr>`).join('')+
+   (r.other?`<tr><td>Slips outside the paused list</td><td class="n">-</td><td class="n">${money(r.other)}</td><td class="n neg">${money(-r.other)}</td><td class="n neg">${money(-r.other)}</td></tr>`:'')+
+   `<tr class="g"><td>Total</td><td class="n">${money(r.cats.reduce((a,c)=>a+c.usual,0))}</td><td class="n">${money(r.slipTotal)}</td><td class="n">${money(r.saved)}</td><td class="n">${money(r.full)}</td></tr></table></div>`;
+  const rep={};Object.values(st.marks).filter(m=>m.s==='slip').forEach(m=>rep[m.cat]=(rep[m.cat]||0)+1);
+  const two=Object.keys(rep).filter(k=>rep[k]>=2);if(two.length)h+=`<div class="warn">Two slips or more in: ${two.map(esc).join(', ')}. That category needs a written rule (what you do instead), not more willpower.</div>`;
+  $('out').innerHTML=h}
+function all(){save();drawCal();drawOut()}
+$('start').value=st.start;$('len').value=String(st.days);drawCats();all();
+$('start').onchange=e=>{if(e.target.value){st.start=e.target.value;sel=null;all()}};
+$('len').onchange=e=>{st.days=+e.target.value;all()};
+$('bills').oninput=e=>{const i=e.target.dataset.i,k=e.target.dataset.k;if(i==null)return;const old=st.cats[i].name;
+  if(k==='weekly')st.cats[i].weekly=Math.max(0,Math.round((parseFloat(e.target.value)||0)*100));else{st.cats[i].name=e.target.value;Object.values(st.marks).forEach(m=>{if(m.cat===old)m.cat=e.target.value})}all()};
+$('bills').onclick=e=>{const i=e.target.dataset.del;if(i!=null){st.cats.splice(+i,1);drawCats();all()}};
+$('add').onclick=()=>{st.cats.push({name:'New category '+(st.cats.length+1),weekly:0});drawCats();all()};
+$('cal').onclick=e=>{const b=e.target.closest('button');if(!b)return;sel=b.dataset.d;drawCal()};
+$('ed').onclick=e=>{if(e.target.id==='eok'){st.marks[sel]={s:'ok'};all()}
+  else if(e.target.id==='eclr'){delete st.marks[sel];all()}
+  else if(e.target.id==='eslip'){const a=Math.max(0,Math.round((parseFloat($('eamt').value)||0)*100));st.marks[sel]={s:'slip',amt:a,cat:$('ecat').value,note:$('enote').value};all()}};
+$('clr').onclick=()=>{if(!confirm('Clear the example and start your own challenge today?'))return;st={start:TODAY,days:30,cats:[{name:'Takeaway and delivery',weekly:0},{name:'Coffee out',weekly:0},{name:'Clothes',weekly:0}],marks:{}};sel=null;$('start').value=st.start;$('len').value='30';drawCats();all()};
+$('prn').onclick=()=>print();
+$('csv').onclick=()=>{const q=s=>'"'+String(s).replace(/"/g,'""')+'"';const r=compute(st,TODAY);
+  const rows=[['date','day','status','amount','category','note']].concat(r.dates.map((d,i)=>{const m=st.marks[d]||{};return[d,i+1,m.s==='ok'?'no-spend':m.s==='slip'?'slip':'',m.s==='slip'?(m.amt/100).toFixed(2):'',m.cat||'',m.note||'']}));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.map(x=>x.map(q).join(',')).join('\r\n')],{type:'text/csv'}));a.download='no-spend-challenge.csv';a.click()};
+</script>
+</body>
+</html>
